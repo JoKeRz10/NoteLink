@@ -1,0 +1,12 @@
+PyPDF2
+openai-whisper
+yt-dlp
+youtube-transcript-api
+beautifulsoup4
+fastapi
+uvicorn
+sqlalchemy
+mcp
+httpx
+pydantic
+python-multipart

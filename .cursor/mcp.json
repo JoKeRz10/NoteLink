@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "NoteLink": {
+      "command": "/usr/bin/python3",
+      "args": [
+        "/home/saka/Documents/ST Project/NoteLink/backend/mcp_server.py"
+      ]
+    }
+  }
+}
