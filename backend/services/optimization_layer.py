@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
-from ..models import File, Transcript, Summary, TaskCache
-from ..utils.hashing import calculate_file_hash, calculate_text_hash
-from . import processing_service, storage_service
+from models import File, Transcript, Summary, TaskCache
+from utils.hashing import calculate_file_hash, calculate_text_hash
+import services.processing_service as processing_service
+import services.storage_service as storage_service
 import uuid
 import json
 

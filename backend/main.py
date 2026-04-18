@@ -6,9 +6,9 @@ import sqlite3
 import os
 import json
 import sys
-from .database import engine, Base, SessionLocal, get_db as get_new_db
-from .models import Note, Setting
-from .services import storage_service, optimization_layer
+import database
+import models
+from services import storage_service, optimization_layer
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
@@ -56,7 +56,8 @@ def init_db():
         conn.commit()
     
     # New SQLAlchemy init
-    Base.metadata.create_all(bind=engine)
+    # New SQLAlchemy init
+    database.Base.metadata.create_all(bind=database.engine)
 
 init_db()
 
@@ -191,7 +192,7 @@ async def summarize_note(
         
         # SMART RETRIEVAL: Check if we already have a summary for this note
         # Use new optimization layer first if possible
-        db = SessionLocal()
+        db = database.SessionLocal()
         try:
             # Get settings for AI
             with get_db() as conn:
@@ -387,7 +388,7 @@ import shutil
 async def handle_file_upload(
     file: UploadFile = File(...), 
     type: str = Form("auto"),
-    db: Session = Depends(get_new_db)
+    db: Session = Depends(database.get_db)
 ):
     """Extracts text from various file types with hashing and caching."""
     filename = file.filename

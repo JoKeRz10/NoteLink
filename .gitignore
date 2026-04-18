@@ -14,7 +14,7 @@ dist-ssr
 # Database and Storage
 *.db
 backend/storage/
-backend/__pycache__/
+**/__pycache__/
 venv/
 .env
 

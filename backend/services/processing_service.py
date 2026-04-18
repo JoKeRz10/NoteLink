@@ -5,7 +5,7 @@ except ImportError:
 import os
 import httpx
 import sqlite3
-from ..database import DB_PATH  # Still need this for settings retrieval or move settings to SQLAlchemy later
+import database
 
 async def transcribe_media(file_path: str) -> str:
     """Transcribes audio/video using Whisper with fallback."""

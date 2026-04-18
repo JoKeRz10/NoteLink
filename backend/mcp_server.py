@@ -1,8 +1,8 @@
 from mcp.server.fastmcp import FastMCP
 import sqlite3
 import os
-from .database import SessionLocal
-from .services import optimization_layer
+import database
+from services import optimization_layer
 
 # Initialize FastMCP server
 mcp = FastMCP("NoteTaking")
@@ -166,7 +166,7 @@ async def transcribe_youtube(url: str) -> str:
 @mcp.tool()
 async def turn_text_into_tasks(text: str) -> str:
     """Turns raw text into a list of actionable tasks with caching."""
-    db = SessionLocal()
+    db = database.SessionLocal()
     try:
         # Get settings for AI
         with sqlite3.connect(DB_PATH) as conn:
