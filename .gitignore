@@ -13,6 +13,9 @@ dist-ssr
 *.local
 # Database and Storage
 *.db
+*.db-wal
+*.db-shm
+
 backend/storage/
 **/__pycache__/
 venv/

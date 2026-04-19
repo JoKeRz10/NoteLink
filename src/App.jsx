@@ -604,18 +604,22 @@ function App() {
   const fetchNoteDetail = async (id) => {
     try {
       const res = await fetch(`http://127.0.0.1:8002/notes/${id}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        setNodes(prev => prev.map(n => n.id === id ? { ...n, content: "" } : n));
+        return;
+      }
       const data = await res.json();
       setNodes(prev => prev.map(n => n.id === id ? { 
         ...n, 
         content: data.content ?? "", 
         ai_summary: data.ai_summary 
       } : n));
-
     } catch (err) {
       console.error("Failed to fetch note detail:", err);
+      setNodes(prev => prev.map(n => n.id === id ? { ...n, content: "" } : n));
     }
   };
+
 
   useEffect(() => {
     if (activeFileId) {

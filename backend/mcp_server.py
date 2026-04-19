@@ -10,7 +10,10 @@ mcp = FastMCP("NoteTaking")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "notes.db")
 
 def get_db_conn():
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    return conn
 
 @mcp.tool()
 async def read_current_note(note_id: str) -> str:
@@ -57,11 +60,15 @@ async def save_ai_summary(note_id: str, summary: str) -> str:
         if row:
             new_content = row[0] + f"\n\n--- AI SUMMARY ---\n{summary}"
             c.execute("UPDATE notes SET content = ? WHERE id = ?", (new_content, note_id))
-            # Refresh FTS index for this change
-            c.execute("INSERT INTO notes_fts(notes_fts) VALUES('rebuild')")
+            
+            # Incremental Search update
+            c.execute("DELETE FROM notes_fts WHERE rowid = (SELECT rowid FROM notes WHERE id = ?)", (note_id,))
+            c.execute("INSERT INTO notes_fts(rowid, title, content) SELECT rowid, title, content FROM notes WHERE id = ?", (note_id,))
+            
             conn.commit()
             return "Summary saved successfully."
         return "Note not found."
+
 
 @mcp.tool()
 async def fetch_web_content(url: str) -> str:

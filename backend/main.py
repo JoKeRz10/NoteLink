@@ -35,8 +35,12 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "notes.db")
 # Global connection helper to avoid repeated file opens
 def get_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # Access columns by name
+    # CRITICAL: Enable WAL mode for high concurrency (read while writing)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.row_factory = sqlite3.Row
     return conn
+
 
 # Initialize both old SQLite and new SQLAlchemy
 def init_db():
@@ -123,17 +127,19 @@ async def sync_notes(notes: list = Body(...)):
 
             
         # 4. High-speed batch insertion
-        c.executemany(
-            "INSERT OR REPLACE INTO notes (id, title, content, lastModified, ai_summary) VALUES (?, ?, ?, ?, ?)",
-            to_update
-        )
-        
-        # 5. Incremental FTS Update
-        try:
-            c.execute("INSERT INTO notes_fts(notes_fts) VALUES('rebuild')")
-        except sqlite3.OperationalError:
-            pass # FTS5 might not be enabled
+        if to_update:
+            c.executemany(
+                "INSERT OR REPLACE INTO notes (id, title, content, lastModified, ai_summary) VALUES (?, ?, ?, ?, ?)",
+                to_update
+            )
             
+            # 5. Incremental FTS update (MUCH faster than rebuild)
+            # Delete old entries from FTS for these IDs and re-insert
+            for note_tuple in to_update:
+                nid = note_tuple[0]
+                c.execute("DELETE FROM notes_fts WHERE rowid = (SELECT rowid FROM notes WHERE id = ?)", (nid,))
+                c.execute("INSERT INTO notes_fts(rowid, title, content) SELECT rowid, title, content FROM notes WHERE id = ?", (nid,))
+
         conn.commit()
         
     return {"status": "success", "synced_count": len(notes)}
