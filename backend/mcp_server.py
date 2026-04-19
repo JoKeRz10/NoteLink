@@ -30,20 +30,22 @@ async def search_notes(query: str) -> list:
         # High performance Full-Text Search using MATCH
         try:
             c.execute("""
-                SELECT id, title, content 
-                FROM notes 
-                JOIN notes_fts ON notes.rowid = notes_fts.rowid 
+                SELECT n.id, n.title, n.lastModified, snippet(notes_fts, 1, '[', ']', '...', 20) as snippet
+                FROM notes n
+                JOIN notes_fts ON n.rowid = notes_fts.rowid 
                 WHERE notes_fts MATCH ? 
                 ORDER BY rank
-            """, (query,))
+                LIMIT 20
+            """, (f"*{query}*",))
             rows = c.fetchall()
         except sqlite3.OperationalError:
             # Fallback if FTS5 is not ready or has issues
-            c.execute("SELECT id, title, content FROM notes WHERE title LIKE ? OR content LIKE ?", 
+            c.execute("SELECT id, title, lastModified FROM notes WHERE title LIKE ? OR content LIKE ? LIMIT 20", 
                       (f'%{query}%', f'%{query}%'))
             rows = c.fetchall()
             
         return [dict(r) for r in rows]
+
 
 @mcp.tool()
 async def save_ai_summary(note_id: str, summary: str) -> str:

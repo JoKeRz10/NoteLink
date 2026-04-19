@@ -1,5 +1,6 @@
 import { Plus, FileText, Trash2, Search, Folder, FolderOpen, Edit2, FilePlus, FolderPlus, X } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+
 
 // Recursive Node Component
 function SidebarNode({ node, nodes, level, activeFileId, onSelectFile, onCreateNode, onUpdateNode, onDeleteNode }) {
@@ -103,17 +104,41 @@ function SidebarNode({ node, nodes, level, activeFileId, onSelectFile, onCreateN
 
 export default function Sidebar({ nodes, activeFileId, onSelectFile, onCreateNode, onUpdateNode, onDeleteNode }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const filteredNodes = useMemo(() => {
-    if (!searchQuery.trim()) return null;
-    return nodes.filter(n => 
-      n.type === 'file' && 
-      (n.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-       n.content.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  }, [nodes, searchQuery]);
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchQuery.trim()) {
+        setIsSearching(true);
+        try {
+          const response = await fetch(`http://127.0.0.1:8002/search?q=${encodeURIComponent(searchQuery)}`);
+          if (response.ok) {
+            const data = await response.json();
+            setSearchResults(data);
+          }
+        } catch (err) {
+          console.error("Search failed:", err);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
 
-  const rootNodes = nodes.filter(n => !n.parentId || !nodes.find(parent => parent.id === n.parentId));
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  const filteredNodes = searchResults;
+
+
+  const rootNodes = useMemo(() => {
+    if (!nodes || !Array.isArray(nodes)) return [];
+    const nodeIds = new Set(nodes.map(n => n.id));
+    return nodes.filter(n => !n.parentId || !nodeIds.has(n.parentId));
+  }, [nodes]);
+
 
   return (
     <div className="sidebar">
@@ -155,21 +180,37 @@ export default function Sidebar({ nodes, activeFileId, onSelectFile, onCreateNod
             <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
               Search Results
             </div>
-            {filteredNodes.length > 0 ? (
+            {isSearching ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>
+                <div className="loader-mini" style={{ margin: '0 auto' }}></div>
+              </div>
+            ) : (filteredNodes && filteredNodes.length > 0) ? (
               filteredNodes.map(node => (
-                <div 
-                  key={node.id}
-                  className={`node-row ${node.id === activeFileId ? 'active' : ''}`}
-                  onClick={() => onSelectFile(node.id)}
-                  style={{ paddingLeft: '8px' }}
-                >
-                  <div className="node-content">
-                    <span className="node-icon"><FileText size={16} /></span>
-                    <span className="node-title">{node.title}</span>
+                node && (
+                  <div 
+                    key={node.id}
+                    className={`node-row ${node.id === activeFileId ? 'active' : ''}`}
+                    onClick={() => node.id && onSelectFile(node.id)}
+                    style={{ paddingLeft: '8px' }}
+                  >
+                    <div className="node-content" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className="node-icon"><FileText size={16} /></span>
+                        <span className="node-title">{node.title || 'Untitled'}</span>
+                      </div>
+                      {node.snippet && (
+                        <div 
+                          className="search-snippet" 
+                          dangerouslySetInnerHTML={{ __html: node.snippet }}
+                          style={{ fontSize: '0.75rem', opacity: 0.6, paddingLeft: '24px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
+                )
               ))
             ) : (
+
               <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                 No matches found.
               </div>

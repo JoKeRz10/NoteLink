@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Eye, Edit3, Sparkles, BookOpen, Share, Calendar, Hexagon, Database, Settings, Kanban } from 'lucide-react';
+import { Eye, Edit3, Sparkles, BookOpen, Share, Calendar, Hexagon, Database, Settings, Kanban, FileUp } from 'lucide-react';
 import { marked } from 'marked';
 import AIPanel from './AIPanel';
 import SummarizerPanel from './SummarizerPanel';
 
-export default function Editor({ file, onChange }) {
+export default function Editor({ file, onChange, onUpload }) {
+  const fileInputRef = useRef(null);
   const [isPreview, setIsPreview] = useState(false);
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [isSummarizerOpen, setIsSummarizerOpen] = useState(false);
@@ -376,6 +377,22 @@ export default function Editor({ file, onChange }) {
           >
             <Share size={18} /> Save note to
           </button>
+
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            style={{ display: 'none' }} 
+            accept=".pdf,.doc,.docx,.txt"
+            onChange={(e) => onUpload(e.target.files)}
+          />
+          <button 
+            className="ai-btn"
+            onClick={() => fileInputRef.current.click()}
+            title="Upload PDF or Text File"
+          >
+            <FileUp size={18} /> Upload PDF
+          </button>
+
           
           {showExportMenu && (
             <div className="export-dropdown fade-in" style={{

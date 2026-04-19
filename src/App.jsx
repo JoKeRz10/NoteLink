@@ -491,13 +491,15 @@ function App() {
         }));
         
         setNodes(prev => {
+          if (!dbNodes || !Array.isArray(dbNodes)) return prev;
           const localNodes = [...prev];
           let hasChanges = false;
           for (const dbNode of dbNodes) {
+             if (!dbNode || !dbNode.id) continue;
              const existingIdx = localNodes.findIndex(n => n.id === dbNode.id);
              if (existingIdx >= 0) {
-                if (dbNode.lastModified > localNodes[existingIdx].lastModified) {
-                   localNodes[existingIdx] = dbNode;
+                if (dbNode.lastModified > (localNodes[existingIdx].lastModified || 0)) {
+                   localNodes[existingIdx] = { ...localNodes[existingIdx], ...dbNode };
                    hasChanges = true;
                 }
              } else {
@@ -508,10 +510,8 @@ function App() {
           return hasChanges ? localNodes : prev;
         });
         
-        setActiveFileId(prev => {
-           if (!prev && dbNodes.length > 0) return dbNodes[0].id;
-           return prev;
-        });
+        // Don't auto-select a note — let the "Ready to create?" landing page show
+
       })
       .catch(err => console.error("Failed to fetch notes:", err));
   };
@@ -571,12 +571,16 @@ function App() {
     if (hasLoaded.current) {
       localStorage.setItem('obsidian-nodes', JSON.stringify(nodes));
       
-      // Sync to backend
-      fetch('http://127.0.0.1:8002/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nodes)
-      }).catch(err => console.error("Sync failed:", err));
+      // Sync to backend (only sync fully loaded notes to avoid overwriting content with undefined)
+      const nodesToSync = nodes.filter(n => n.type !== 'file' || n.content !== undefined);
+      if (nodesToSync.length > 0) {
+        fetch('http://127.0.0.1:8002/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(nodesToSync)
+        }).catch(err => console.error("Sync failed:", err));
+      }
+
     }
   }, [nodes]);
 
@@ -596,6 +600,31 @@ function App() {
   };
 
   const activeFile = getActiveFile();
+
+  const fetchNoteDetail = async (id) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8002/notes/${id}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setNodes(prev => prev.map(n => n.id === id ? { 
+        ...n, 
+        content: data.content ?? "", 
+        ai_summary: data.ai_summary 
+      } : n));
+
+    } catch (err) {
+      console.error("Failed to fetch note detail:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeFileId) {
+      const active = nodes.find(n => n.id === activeFileId);
+      if (active && active.type === 'file' && active.content === undefined) {
+        fetchNoteDetail(activeFileId);
+      }
+    }
+  }, [activeFileId, nodes]);
 
   const handleCreateNode = (type, parentId = null) => {
     const newNode = {
@@ -892,13 +921,23 @@ function App() {
       
       <div className="main-content">
         {activeTab === 'note' ? (
-          (activeFile && activeFile.content !== '') ? (
-            <Editor 
-              file={activeFile} 
-              onChange={(updates) => handleUpdateNode(activeFile.id, updates)} 
-              key={activeFile.id}
-            />
+          activeFile ? (
+            activeFile.content === undefined ? (
+              <div className="loading-container fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <div className="loader-mini" style={{ width: 40, height: 40, marginBottom: '1rem' }}></div>
+                <p style={{ color: 'var(--text-secondary)' }}>Loading Note Content...</p>
+              </div>
+            ) : (
+              <Editor 
+                file={activeFile} 
+                onChange={(updates) => handleUpdateNode(activeFile.id, updates)} 
+                onUpload={handleFileUpload}
+                key={activeFile.id}
+              />
+
+            )
           ) : (
+
             <div className="note-start-page fade-in">
               <div className="start-hero">
                 <div className="icon-stack">

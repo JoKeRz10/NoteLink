@@ -38,42 +38,7 @@ This report documents the core improvements implemented in the **NoteLink** back
 | **Network usage** | High bandwidth consumption | Minimum bandwidth for list view |
 | **Loading** | Front-loaded (Slow startup) | On-demand (`Lazy Loading`) |
 
----
 
-## 4. Efficient Connection Management
-**Problem:** Opening and closing database connections for every request added unnecessary overhead (latency).
-**Solution:** Implemented a shared `get_db()` helper with `sqlite3.Row` factory for optimized data access.
-
-| Metric | Before Optimization | After Optimization |
-| :--- | :--- | :--- |
-| **Connectivity** | Transient (Open/Close per request) | Context-managed durable helper |
-| **Data Access** | Tuple indexing (`r[0]`) | Key-value mapping (`r['title']`) |
-
----
-
-## 5. AI Summary Persistence (Smart Retrieval)
-**Problem:** Generating summaries is the most expensive and slowest operation in the app. Users previously had to wait for the same summary every time they opened a note.
-**Solution:** Added `ai_summary` storage with smart invalidation logic.
-
-| Metric | Before Optimization | After Optimization |
-| :--- | :--- | :--- |
-| **Response Time** | 10-30 seconds (AI Generation) | ~10 milliseconds (Database Retrieval) |
-| **API Cost** | Paid for every click | One-time cost per note version |
-| **Smart Sync** | Summaries lost on sync | Summaries preserved unless content changes |
-
----
-
-## 6. URL Summaries Persistence (Moving from LocalStorage to DB)
-**Problem:** Summaries of URLs (like YouTube videos) were previously stored only in the browser's LocalStorage. If the user cleared their cache or changed computers, their expensive AI generation history was lost.
-**Solution:** Created a dedicated `url_summaries` table in the SQLite database to store this history permanently.
-
-| Metric | Before Optimization | After Optimization |
-| :--- | :--- | :--- |
-| **Storage Type** | Volatile (Browser LocalStorage) | Permanent (SQLite Database) |
-| **Reliability** | Low (Cleared with cache) | High (Backed up with DB) |
-| **Cross-Device** | Not supported | Ready for cloud sync/backend sharing |
-
----
 
 > [!TIP]
 > These optimizations ensure that **NoteLink** scales perfectly, handling thousands of notes and massive video transcripts without any performance degradation.
