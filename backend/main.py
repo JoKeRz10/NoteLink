@@ -190,6 +190,27 @@ def extract_youtube_video_id(url):
             return parsed.path.split('/')[2]
     return None
 
+def detect_language(text: str) -> str:
+    """Detect if the content is primarily Arabic or English, focusing on the transcript."""
+    if not text: return "en"
+    
+    # Try to isolate the actual transcript if the marker exists
+    transcript_section = text
+    if "=== ACTUAL VIDEO TRANSCRIPT" in text:
+        try:
+            transcript_section = text.split("=== ACTUAL VIDEO TRANSCRIPT")[1].split("===")[0].strip()
+        except:
+            pass # Fallback to whole text
+            
+    import re
+    arabic_chars = re.findall(r'[\u0600-\u06FF]', transcript_section)
+    ratio = len(arabic_chars) / (len(transcript_section) + 1)
+    
+    # Log for debugging
+    print(f"DEBUG: Lang Detection | Ratio: {ratio:.4f} | Detected: {'ar' if ratio > 0.05 else 'en'}")
+    
+    return "ar" if ratio > 0.05 else "en"
+
 # Core transcription and fetching logic moved to mcp_server.py
 
 async def get_url_metadata(url: str):
@@ -289,20 +310,46 @@ async def summarize_note(
     if content == "Note not found.":
         raise HTTPException(status_code=404, detail="Note not found.")
     
-    # Refined prompt for holistic analysis of the entire content
-    mode_instruction = "Provide a deep, professional text summary." if mode == 'text' else "Provide a detailed narration-style script / transcription."
-    prompt_settings = f"MODE: {mode_instruction}. TARGET LENGTH: {length} words. "
-    if url and ("youtube" in url or "youtu.be" in url):
-        prompt_settings += f"IMPORTANT: Analyze the ENTIRE video transcript provided below. Do not truncate the source material. Your summary must cover all major points from start to finish within the requested {length} word limit."
-
-    # Dynamic language logic based on mode
+    # Language detection
+    detected_lang = detect_language(content)
+    
+    # Calculate target length based on mode
     if mode == 'audio':
-        lang_instruction = "IMPORTANT: For this Voice Narration script, you MUST respond in ENGLISH exclusively, even if the source video/content is in Arabic or another language. This is to ensure compatibility with audio playback systems."
+        # ~150 words per minute
+        target_words = int((duration / 60) * 150)
+        max_words = int(((duration + 15) / 60) * 150)
+        
+        mode_instruction = (
+            f"Provide a natural, structured narration-style script for a {duration}-second voiceover. "
+            "STRICT RULES:\n"
+            "1. NO REPETITION: Do not repeat any facts, points, or phrases. Every sentence must add new value.\n"
+            f"2. PRECISION TIMING: The script should comfortably fill {duration} seconds. "
+            f"You have a buffer up to {duration + 15} seconds maximum to complete your final thought, but do not exceed it.\n"
+            "3. STRUCTURE: Include a brief intro, a comprehensive body covering the source, and a clear conclusion."
+        )
+        length_constraint = f"LENGTH TARGET: {target_words} words. ABSOLUTE MAXIMUM: {max_words} words."
     else:
-        lang_instruction = "IMPORTANT: You MUST respond in the SAME language as the source content. If the content is in Arabic, provide the summary in professional Arabic. If it is in English, use professional English."
+        mode_instruction = (
+            "Provide a deep, professional text summary. "
+            "STRICT NO-REPETITION POLICY: Do not repeat information or concepts."
+        )
+        length_constraint = f"TARGET LENGTH: {length} words."
+
+    # Refined language instruction
+    if detected_lang == "ar":
+        lang_instruction = (
+            "PRIMARY LANGUAGE: ARABIC. You MUST respond in professional ARABIC only. "
+            "STRICT RULE: Do not translate to English. Do not use English words unless they are technical terms with no Arabic equivalent."
+        )
+    else:
+        lang_instruction = (
+            "PRIMARY LANGUAGE: ENGLISH. You MUST respond in professional ENGLISH only. "
+            "STRICT RULE: Do not translate to Arabic. The output must be 100% in English."
+        )
 
     default_prompt = (
-        f"{prompt_settings}\n"
+        f"MODE: {mode_instruction}\n"
+        f"{length_constraint}\n"
         "Analyze the provided content and provide the requested output. "
         f"{lang_instruction}\n"
         "Focus STRICTLY on the actual narrative, educational, or informative content. "
@@ -351,9 +398,11 @@ async def summarize_note(
                 except (KeyError, IndexError):
                     return {"summary": "Error parsing Gemini response."}
             else:
-                print(f"DEBUG: Calling Ollama API at {OLLAMA_URL}...")
+                # Choose model based on mode: Speed for audio, depth for text
+                ollama_model = "llama3.2:latest" if mode == 'audio' else "gemma4:latest"
+                print(f"DEBUG: Calling Ollama API ({ollama_model}) at {OLLAMA_URL}...")
                 response = await client.post(OLLAMA_URL, json={
-                    "model": "gemma4:latest",
+                    "model": ollama_model,
                     "prompt": final_prompt,
                     "stream": False
                 })
