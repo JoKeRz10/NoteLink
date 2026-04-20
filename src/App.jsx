@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { FileText, LayoutDashboard, Sparkles, CheckSquare, Calendar, Plus, Activity, Play, Pause, Database, Hexagon, Settings, Kanban, HelpCircle } from 'lucide-react';
+import { FileText, LayoutDashboard, Sparkles, CheckSquare, Calendar, Plus, Activity, Play, Pause, Database, Hexagon, Settings, Kanban, HelpCircle, Copy } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
 import Dashboard from './components/Dashboard';
@@ -1093,9 +1093,9 @@ function App() {
                 </>
                 ) : (
                   <div className="latest-result-card fade-in">
-                    <button className="back-btn-branded" onClick={() => setActiveSummaryId(null)}>
+                    <button className="back-btn-branded" onClick={() => { setActiveSummaryId(null); setSummarizeMode(null); }}>
                       <Plus size={16} style={{transform: 'rotate(45deg)', marginRight: '8px'}} />
-                      Back to Summarizer
+                      Back to Selection / العودة للاختيار
                     </button>
                     <div className="result-header">
                       <div className="result-meta">
@@ -1145,6 +1145,31 @@ function App() {
                         >
                           {isPlayingVoice ? <Pause size={18} /> : <Play size={18} />}
                           {isPlayingVoice ? "Stop Narration" : "Listen to Script"}
+                        </button>
+                        <button 
+                          className="play-voice-btn secondary" 
+                          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-primary)' }}
+                          onClick={() => {
+                             setActiveSummaryId(null);
+                             setSummarizeMode(null);
+                          }}
+                        >
+                          <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
+                          New Analysis / تحليل جديد
+                        </button>
+                        <button 
+                          className="play-voice-btn" 
+                          style={{ background: 'rgba(94, 106, 210, 0.1)', color: 'var(--accent)', marginLeft: 'auto' }}
+                          onClick={() => {
+                             const s = summaries.find(ss => ss.id === activeSummaryId);
+                             if(s) {
+                               navigator.clipboard.writeText(s.summary);
+                               // Optional: Add a toast or alert if needed
+                             }
+                          }}
+                        >
+                          <Copy size={18} />
+                          Copy Script / نسخ النص
                         </button>
                       </div>
                     )}
