@@ -266,6 +266,20 @@ async def summarize_note(
 
     title = "Analysis Result"
     if url:
+        # Check if URL already exists in url_summaries
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT title, summary FROM url_summaries WHERE url = ? ORDER BY timestamp DESC LIMIT 1", (url,))
+            row = c.fetchone()
+            if row:
+                print(f"DEBUG: Returning cached URL summary for {url}")
+                return {
+                    "summary": row["summary"], 
+                    "title": row["title"], 
+                    "message": "This URL has already been summarized. Showing the previous result to save time.",
+                    "cached": True
+                }
+
         title = await get_url_metadata(url)
         print(f"DEBUG: URL Analysis | Title: {title} | Mode: {mode}")
         from mcp_server import transcribe_youtube, fetch_web_content
@@ -273,6 +287,7 @@ async def summarize_note(
             content = await transcribe_youtube(url)
         else:
             content = await fetch_web_content(url)
+
 
     if not content:
         if not note_id:

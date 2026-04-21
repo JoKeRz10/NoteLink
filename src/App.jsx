@@ -411,18 +411,25 @@ function App() {
     stopVoice();
     if (!text) return;
     const utterance = new SpeechSynthesisUtterance(text);
-    const isArabic = /[\u0600-\u06FF]/.test(text);
-    const lang = isArabic ? 'ar' : 'en';
     
-    const voice = findBestVoice(lang);
+    // Same Arabic detection logic as SummarizerPanel
+    const isArabic = /[\u0600-\u06FF]/.test(text);
+    
+    // Always set lang explicitly first (same as SummarizerPanel line 114)
+    utterance.lang = isArabic ? 'ar-SA' : 'en-US';
+    utterance.rate = 0.95; // Natural pacing (same as SummarizerPanel)
+    
+    // Try to find a better voice, but keep the explicit lang as fallback
+    const voice = findBestVoice(isArabic ? 'ar' : 'en');
     if (voice) {
       utterance.voice = voice;
-      utterance.lang = voice.lang;
-    } else {
-      utterance.lang = isArabic ? 'ar-SA' : 'en-US';
+      // Only override lang if the voice actually matches the detected language
+      if ((isArabic && voice.lang.startsWith('ar')) || (!isArabic && voice.lang.startsWith('en'))) {
+        utterance.lang = voice.lang;
+      }
     }
     
-    // Smooth progress based on characters (avg 150 words/min = 2.5 words/sec ~ 15 chars/sec)
+    // Smooth progress based on characters
     const durationEstimate = text.length * 75; 
     const start = Date.now();
     const interval = setInterval(() => {
@@ -445,6 +452,7 @@ function App() {
     window.speechSynthesis.speak(utterance);
     setIsPlayingVoice(true);
   };
+
 
   useEffect(() => {
     if (activeSummaryId) {
@@ -746,11 +754,18 @@ function App() {
       if (!response.ok) throw new Error("Analysis failed / فشل التحليل");
       const data = await response.json();
       
+      if (data.message) {
+        // You could use a toast library here, but for now we'll log it and use it in the UI
+        console.log("NoteLink info:", data.message);
+      }
+      
       const newSummary = {
         id: (Date.now() + Math.random()).toString(),
         url,
         title: data.title && data.title !== "Analysis Result" ? data.title : (url.includes('youtube') ? '🎥 YouTube Video Analysis' : '📄 Web Page Analysis'),
         summary: data.summary || "No summary generated.",
+        message: data.message,
+
         mode: summarizeMode,
         timestamp: Date.now()
       };
